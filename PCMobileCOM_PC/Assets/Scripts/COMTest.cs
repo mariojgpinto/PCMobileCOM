@@ -7,6 +7,10 @@ public class COMTest : MonoBehaviour {
 
 	public Texture2D imageToSend;
 
+	Texture2D imageReceived = null;
+
+
+
 	#region BUTTON_CALLBACKS
 	public void OnButtonPressed(int id){
 		switch(id){
@@ -24,6 +28,9 @@ public class COMTest : MonoBehaviour {
 			byte[] textureBytes = imageToSend.EncodeToPNG();
 
 			server.BroadcastImage(textureBytes, imageToSend.width, imageToSend.height);
+
+			break;
+		case 3 :
 
 			break;
 		case 100 :
@@ -56,14 +63,20 @@ public class COMTest : MonoBehaviour {
 			else
 			if(data.Value.type == COMData.TYPE.IMAGE){
 				COMData_image image = (COMData_image)data.Value;
-				
-				Texture2D texture = new Texture2D(image.imageWidth, image.imageHeight);
-				texture.LoadImage(image.data);
-				texture.Apply();
 
-				Log.AddToLog("Image Received: " + texture.width + " x " + texture.height);
+				if(imageReceived == null){
+					imageReceived = new Texture2D(image.imageWidth, image.imageHeight);
+				}
+				else{
+					if(image.imageWidth != imageReceived.width || image.imageHeight != imageReceived.height){
+						imageReceived = new Texture2D(image.imageWidth, image.imageHeight);
+					}
+				}
+				imageReceived.LoadImage(image.data);
+
+				Log.AddToLog("Image Received: " + imageReceived.width + " x " + imageReceived.height);
 				
-				GameObject.Find("RawImage").GetComponent<RawImage>().texture = texture;
+				GameObject.Find("RawImage").GetComponent<RawImage>().texture = imageReceived;
 			}
 			else
 			if(data.Value.type == COMData.TYPE.AUDIO){

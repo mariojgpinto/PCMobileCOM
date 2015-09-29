@@ -32,7 +32,7 @@ public class SocketServerWorker{
 	byte[] mainBuffer = new byte[bufferSize];
 	
 	bool bigIncoming = false;
-	byte[] auxBuffer = null;
+	byte[] imageBuffer = new byte[10000000];
 	
 	#endregion
 	
@@ -310,12 +310,14 @@ public class SocketServerWorker{
 		COMData_image image = new COMData_image();
 		image.imageWidth = imageWidth;
 		image.imageHeight = imageHeight;
-		image.data = new byte[imageSize];
+		image.size = imageSize;
+		image.data = imageBuffer;
+
 		
 		int bytesReceived = 0;
 		
 		while(bytesReceived != imageSize){
-			int tmp = socket.Receive(image.data, bytesReceived, imageSize - bytesReceived, SocketFlags.None);
+			int tmp = socket.Receive(imageBuffer, bytesReceived, imageSize - bytesReceived, SocketFlags.None);
 			bytesReceived += tmp;
 			Log.AddToLog(id + "|" + bytesReceived + " bytes received so far (" + tmp + " this time) - (" + (imageSize - bytesReceived) + " left)");
 		}
@@ -325,7 +327,7 @@ public class SocketServerWorker{
 		if(imageSize == bytesReceived){
 			server.infoReceived.Enqueue(new KeyValuePair<int, COMData>(id, image));
 			
-			Log.AddToDebug("Image Received: " + image.data.Length);
+			Log.AddToDebug("Image Received: " + bytesReceived);
 		}
 	}
 	

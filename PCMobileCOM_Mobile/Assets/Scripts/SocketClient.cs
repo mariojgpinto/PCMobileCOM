@@ -37,7 +37,7 @@ public class SocketClient {
 
 	bool bigIncoming = false;
 	byte[] auxTextBuffer = null;
-	byte[] auxImageBuffer = null;
+	byte[] auxImageBuffer = new byte[10000000];
 	byte[] auxAudioBuffer = null;
 
 	#endregion

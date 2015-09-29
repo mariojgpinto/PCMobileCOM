@@ -1,9 +1,14 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System;
 
 public class COMTest : MonoBehaviour {
 	SocketClient client;
+
+	Texture2D textureTemp = null;
+	WebCamTexture webCam = null;
+	byte[] imageConverted = new byte[10000000];
 
 	#region BUTTON_CALLBACKS
 	public void OnButtonPressed(int id){
@@ -24,13 +29,24 @@ public class COMTest : MonoBehaviour {
 		case 3 :
 			Debug.Log("IMAGE");
 
-			WebCamTexture raw = GameObject.Find("Main Camera").GetComponent<WebCam>().cam;
-			Texture2D t = new Texture2D(raw.width, raw.height);;
-			t.SetPixels(raw.GetPixels());
+			if(webCam == null)
+				webCam = GameObject.Find("Main Camera").GetComponent<WebCam>().cam;
 
-			Debug.Log("T" + raw.width);
+			if(textureTemp == null)
+				textureTemp = new Texture2D(webCam.width, webCam.height);
 
-			client.SendInfo_image(t.EncodeToJPG(), t.width, t.height);
+			textureTemp.SetPixels32(webCam.GetPixels32());
+
+
+
+//			Debug.Log ((GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture).width + "," + (GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture).height);
+//			IntPtr pointer = webCam.GetNativeTexturePtr();
+//			textureTemp.UpdateExternalTexture(GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture.GetNativeTexturePtr());
+//			textureTemp.Apply();
+
+			imageConverted = textureTemp.EncodeToPNG();
+
+			client.SendInfo_image(imageConverted, textureTemp.width, textureTemp.height);
 
 			break;
 		default: break;
