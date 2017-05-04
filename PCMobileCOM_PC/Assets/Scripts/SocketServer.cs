@@ -22,7 +22,7 @@ public class SocketServer{
 	#region SETUP
 	public void StartServer() {
 		try{
-			server = new TcpListener(IPAddress.Parse("192.168.21.83"), port);
+			server = new TcpListener(IPAddress.Parse("192.168.1.139"), port);
 			
 			// Start listening for client requests.
 			server.Start();
@@ -103,6 +103,15 @@ public class SocketServer{
 	#endregion
 
 	#region COMMUNICATION
+	public void SendMessage(int id, string msg) {
+		foreach (SocketServerWorker client in clients) {
+			if(client.id == id) {
+				client.SendInfo_text(msg);
+				return;
+			}			
+		}
+	}
+
 	public void BroadcastMessage(string msg){
 		foreach(SocketServerWorker client in clients){
 			client.SendInfo_text(msg);

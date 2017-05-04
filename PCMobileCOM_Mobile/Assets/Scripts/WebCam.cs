@@ -18,7 +18,7 @@ public class WebCam : MonoBehaviour {
 			Debug.Log(ac++ + " - " + device.name);
 		}
 #if UNITY_EDITOR
-		cam = new WebCamTexture(devices[2].name, 1920, 1080, 30);
+		cam = new WebCamTexture(devices[0].name, 640, 480, 30);
 #else
 		cam = new WebCamTexture();
 #endif

@@ -77,6 +77,8 @@ public class COMTest : MonoBehaviour {
 				Log.AddToLog("Image Received: " + imageReceived.width + " x " + imageReceived.height);
 				
 				GameObject.Find("RawImage").GetComponent<RawImage>().texture = imageReceived;
+
+				//server.BroadcastMessage("READY");
 			}
 			else
 			if(data.Value.type == COMData.TYPE.AUDIO){

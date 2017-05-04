@@ -29,24 +29,9 @@ public class COMTest : MonoBehaviour {
 		case 3 :
 			Debug.Log("IMAGE");
 
-			if(webCam == null)
-				webCam = GameObject.Find("Main Camera").GetComponent<WebCam>().cam;
+				SendImage();			
 
-			if(textureTemp == null)
-				textureTemp = new Texture2D(webCam.width, webCam.height);
-
-			textureTemp.SetPixels32(webCam.GetPixels32());
-
-
-
-//			Debug.Log ((GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture).width + "," + (GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture).height);
-//			IntPtr pointer = webCam.GetNativeTexturePtr();
-//			textureTemp.UpdateExternalTexture(GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture.GetNativeTexturePtr());
-//			textureTemp.Apply();
-
-			imageConverted = textureTemp.EncodeToPNG();
-
-			client.SendInfo_image(imageConverted, textureTemp.width, textureTemp.height);
+				//sendImages = true;
 
 			break;
 		default: break;
@@ -54,13 +39,61 @@ public class COMTest : MonoBehaviour {
 	}
 	#endregion
 
+	void SendImage()
+	{
+		if (webCam == null)
+			webCam = GameObject.Find("Main Camera").GetComponent<WebCam>().cam;
+
+		if (textureTemp == null)
+			textureTemp = new Texture2D(webCam.width, webCam.height);
+
+		textureTemp.SetPixels32(webCam.GetPixels32());
+
+
+
+		//			Debug.Log ((GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture).width + "," + (GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture).height);
+		//			IntPtr pointer = webCam.GetNativeTexturePtr();
+		//			textureTemp.UpdateExternalTexture(GameObject.Find("RawImageCam").GetComponent<RawImage>().mainTexture.GetNativeTexturePtr());
+		//			textureTemp.Apply();
+
+		imageConverted = textureTemp.EncodeToJPG();
+
+		client.SendInfo_image(imageConverted, textureTemp.width, textureTemp.height);
+	}
+
 	// Use this for initialization
 	void Start () {
 		client = new SocketClient("192.168.21.83");
 
 		client.TryToConnect();
 	}
-	
+
+	bool sendImages = false;
+	//int framesSkiped = 30;
+	//int counter = 0;
+	//void FixedUpdate()
+	//{
+	//	if (sendImages)
+	//	{
+	//		counter++;
+	//		if (counter == framesSkiped)
+	//		{
+	//			if (webCam == null)
+	//				webCam = GameObject.Find("Main Camera").GetComponent<WebCam>().cam;
+
+	//			if (textureTemp == null)
+	//				textureTemp = new Texture2D(webCam.width, webCam.height);
+
+	//			textureTemp.SetPixels32(webCam.GetPixels32());
+
+	//			imageConverted = textureTemp.EncodeToPNG();
+
+	//			client.SendInfo_image(imageConverted, textureTemp.width, textureTemp.height);
+
+	//			counter = 0;
+	//		}
+	//	}
+	//}
 	// Update is called once per frame
 	void Update () {
 		if(client.infoReceived.Count > 0){
@@ -70,6 +103,14 @@ public class COMTest : MonoBehaviour {
 				COMData_text text = (COMData_text)data;
 
 				Log.AddToLog("Message Received: " + text.GetText());
+
+				if (sendImages)
+				{
+					if(text.GetText() == "READY")
+					{
+						SendImage();
+					}
+				}
 			}
 			else
 			if(data.type == COMData.TYPE.IMAGE){

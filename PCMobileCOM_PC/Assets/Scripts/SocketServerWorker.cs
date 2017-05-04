@@ -11,8 +11,16 @@ public class SocketServerWorker{
 	Socket socket;
 	
 	public int id;
-	
-	public bool isConnected = false;
+
+	bool _isConnected = false;
+	public bool isConnected {
+		set {
+			_isConnected = value;
+		}
+		get {
+			return socket.Connected;
+		}
+	}
 	
 	Thread mainThread = null;
 	Thread readThread = null;
@@ -85,8 +93,13 @@ public class SocketServerWorker{
 	
 	public void Close(bool removeFromServer = true) {
 		if(socket != null){
-			socket.Shutdown(SocketShutdown.Both);
-			socket.Close();
+			try {
+				socket.Shutdown(SocketShutdown.Both);
+				socket.Close();
+			}
+			catch (Exception e) {
+				Log.AddToLog("SocketServerWorker", "Close()", "Error closing socket", e.ToString());
+			}
 		}
 		
 		if(removeFromServer)
@@ -168,18 +181,47 @@ public class SocketServerWorker{
 	}
 
 	bool SendText(COMData_text text){
-		string header = 
-				COMData.macroInit + 
-				text.type + 
-				COMData.macroSeparator + 
-				text.data.Length + 
+		string header = "";
+
+		if (text.data.Length < 10000) {
+			header = COMData.macroInit +
+				text.type +
+				COMData.macroSeparator +
+				text.data.Length +
+				COMData.macroSeparator +
+				System.Text.Encoding.UTF8.GetString(text.data, 0, text.data.Length) +
 				COMData.macroEnd;
 
-		Log.AddToDebug(header);
-		socket.Send(System.Text.Encoding.UTF8.GetBytes (header));
-		int bytesSent = socket.Send(text.data);
-		
-		return bytesSent == text.data.Length;
+			Log.AddToDebug(header + " - " + text.data);
+			socket.Send(System.Text.Encoding.UTF8.GetBytes(header));
+			return true;
+		}
+		else {
+			header = COMData.macroInit +
+				text.type +
+				COMData.macroSeparator +
+				text.data.Length +
+				COMData.macroEnd;
+
+			Log.AddToDebug(header + " - " + text.data);
+			socket.Send(System.Text.Encoding.UTF8.GetBytes(header));
+			int bytesSent = socket.Send(text.data);
+
+			return bytesSent == text.data.Length;
+		}
+
+		//string header = 
+		//		COMData.macroInit + 
+		//		text.type + 
+		//		COMData.macroSeparator + 
+		//		text.data.Length + 
+		//		COMData.macroEnd;
+
+		//Log.AddToDebug(header + " - " + text.data);
+		//socket.Send(System.Text.Encoding.UTF8.GetBytes (header));
+		//int bytesSent = socket.Send(text.data);
+
+		//return bytesSent == text.data.Length;
 	}
 
 	bool SendImage(COMData_image image){
@@ -261,12 +303,27 @@ public class SocketServerWorker{
 			
 			if(fields.Length > 0){
 				if(fields[0] == COMData.TYPE.TEXT.ToString()){
-					if(fields.Length >= 2){//								
+					if(fields.Length == 2){//								
 						int stringSize = Convert.ToInt32(fields[1]);
 						ReceiveMessage(stringSize);
 					}
-					else{
-						Log.AddToDebug("Bad Text");
+					else {
+						if (fields.Length == 3) {//	
+							int stringSize = Convert.ToInt32(fields[1]);
+							COMData_text message = new COMData_text();
+							//message.data = new byte[stringSize];
+							message.data = System.Text.Encoding.UTF8.GetBytes(fields[2]);
+
+							server.infoReceived.Enqueue(new KeyValuePair<int, COMData>(id, message));
+
+							Log.AddToDebug("Message Received: " + message.data.Length);
+
+							//RunEvent(OnReceive);
+						}
+						else {
+							//RunEvent(OnReceiveFailed, new SocketArgs("Bad Text"));
+							Log.AddToLog("Bad Text");
+						}
 					}
 				} else{
 					if(fields[0] == COMData.TYPE.IMAGE.ToString()){

@@ -5,13 +5,33 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-
 public class SocketClient {
+	#region EVENTS
+	public event EventHandler<SocketArgs> OnConnect;
+	public event EventHandler<SocketArgs> OnConnectionLost;
+	public event EventHandler<SocketArgs> OnClose;
+	public event EventHandler<SocketArgs> OnReceive;
+	public event EventHandler<SocketArgs> OnReceiveFailed;
+	public event EventHandler<SocketArgs> OnSendSucess;
+	public event EventHandler<SocketArgs> OnSendFailed;
+	#endregion
+
 	#region VARIABLES
+	//public event cenas;
+
 	TcpClient client;
 	Socket socket;
-	public bool isConnected = false;
-	
+
+	bool _isConnected = false;
+	public bool isConnected {
+		set {
+			_isConnected = value;
+		}
+		get {
+			return (socket != null) ? socket.Connected : false;
+		}
+	}
+
 	public string host = "localhost";
 	public int port = 42222; 
 	
@@ -43,6 +63,10 @@ public class SocketClient {
 	#endregion
 
 	#region SETUP
+	public void RunEvent(EventHandler<SocketArgs> evt, SocketArgs args = null) {
+		if (evt != null)
+			evt(this, args);
+	}
 	public SocketClient(string _host = "localhost", int _port = 42222){
 		host = _host;
 		port = _port;
@@ -64,9 +88,12 @@ public class SocketClient {
 				}
 				else{
 					Log.AddToLog("Trying to Connect...");
-					TcpClient client = new TcpClient(host, port);
+					client = new TcpClient(host, port);
 					Log.AddToLog("Connected");
 					socket = client.Client;
+					
+					isConnected = true;
+					ProzisClient.first = true;
 
 					writeThread = new Thread(Send_Threaded);
 					writeThread.Start();
@@ -74,7 +101,7 @@ public class SocketClient {
 					readThread = new Thread(Read_Threaded);
 					readThread.Start();
 
-					isConnected = true;
+					RunEvent(OnConnect);
 				}
 
 				mainWaitInLine.WaitOne(2000);
@@ -104,6 +131,8 @@ public class SocketClient {
 		}
 
 		mainWaitInLine.Set();
+
+		RunEvent(OnConnectionLost);
 	}
 
 	public void Close() {
@@ -123,6 +152,8 @@ public class SocketClient {
 		
 		if(readThread != null)
 			readThread.Abort();
+
+		RunEvent(OnClose);
 	}
 
 	public bool IsConnected()
@@ -158,8 +189,11 @@ public class SocketClient {
 	}
 	
 	bool Send(COMData data) {
-		if (!isConnected)
+		if (!isConnected) {
+			RunEvent(OnSendFailed);
+
 			return false;
+		}
 		
 		try {
 			bool result = false;
@@ -178,11 +212,13 @@ public class SocketClient {
 			}
 			
 			if(!result){
+				RunEvent(OnSendFailed);
 				return false;
 			}
 		} catch 
 		{
-			try {
+			RunEvent(OnSendFailed);
+			try {				
 				Close();
 			} catch (Exception ex) {
 				Log.AddToDebug(ex.ToString());
@@ -191,22 +227,39 @@ public class SocketClient {
 			
 			return false;
 		}
+		RunEvent(OnSendSucess);
 		return true;
 	}
 	
 	bool SendText(COMData_text text){
-		string header = 
-			COMData.macroInit + 
-				text.type + 
-				COMData.macroSeparator + 
-				text.data.Length + 
+		string header = "";
+
+		if (text.data.Length < 10000) {
+			header = COMData.macroInit +
+				text.type +
+				COMData.macroSeparator +
+				text.data.Length +
+				COMData.macroSeparator +
+				System.Text.Encoding.UTF8.GetString(text.data, 0, text.data.Length) +
 				COMData.macroEnd;
 
-		Log.AddToDebug(header);
-		socket.Send(System.Text.Encoding.UTF8.GetBytes (header));
-		int bytesSent = socket.Send(text.data);
-		
-		return bytesSent == text.data.Length;
+			Log.AddToDebug(header + " - " + text.data);
+			socket.Send(System.Text.Encoding.UTF8.GetBytes(header));
+			return true;
+		}
+		else {
+			header = COMData.macroInit +
+				text.type +
+				COMData.macroSeparator +
+				text.data.Length +
+				COMData.macroEnd;
+
+			Log.AddToDebug(header + " - " + text.data);
+			socket.Send(System.Text.Encoding.UTF8.GetBytes(header));
+			int bytesSent = socket.Send(text.data);
+
+			return bytesSent == text.data.Length;
+		}		
 	}
 	
 	bool SendImage(COMData_image image){
@@ -288,12 +341,26 @@ public class SocketClient {
 			
 			if(fields.Length > 0){
 				if(fields[0] == COMData.TYPE.TEXT.ToString()){
-					if(fields.Length >= 2){//								
+					if(fields.Length == 2){//								
 						int stringSize = Convert.ToInt32(fields[1]);
 						ReceiveMessage(stringSize);
 					}
 					else{
-						Log.AddToDebug("Bad Text");
+						if (fields.Length == 3) {//	
+							int stringSize = Convert.ToInt32(fields[1]);
+							COMData_text message = new COMData_text();
+							//message.data = new byte[stringSize];
+							message.data = System.Text.Encoding.UTF8.GetBytes(fields[2]);
+
+							infoReceived.Enqueue(message);
+
+							Log.AddToDebug("Message Received: " + message.data.Length);
+
+							RunEvent(OnReceive);
+						}
+						else {
+							RunEvent(OnReceiveFailed, new SocketArgs("Bad Text"));
+						}
 					}
 				} else{
 					if(fields[0] == COMData.TYPE.IMAGE.ToString()){
@@ -305,11 +372,11 @@ public class SocketClient {
 							ReceiveImage(imageSize, imageWidth, imageHeight);
 						}
 						else{
-							Log.AddToDebug("Bad Text");
+							RunEvent(OnReceiveFailed, new SocketArgs("Bad Text"));
 						}
 					} else{
 						if(fields[0] == COMData.TYPE.AUDIO.ToString()){
-
+							RunEvent(OnReceiveFailed, new SocketArgs("AUDIO MESSAGE - NOT READY"));
 						}
 					}
 				}
@@ -327,6 +394,11 @@ public class SocketClient {
 			infoReceived.Enqueue(message);
 
 			Log.AddToDebug("Message Received: " + message.data.Length);
+
+			RunEvent(OnReceive);
+		}
+		else {
+			RunEvent(OnReceiveFailed, new SocketArgs("Text: " + messageSize + " != " + sizeReceived));
 		}
 	}
 
@@ -350,6 +422,11 @@ public class SocketClient {
 			infoReceived.Enqueue(image);
 
 			Log.AddToDebug("Image Received: " + image.data.Length);
+
+			RunEvent(OnReceive);
+		}
+		else {
+			RunEvent(OnReceiveFailed, new SocketArgs("Image: " + imageSize + " != " + bytesReceived));
 		}
 	}
 
